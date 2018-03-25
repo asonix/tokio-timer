@@ -1,4 +1,4 @@
-use futures::{Future, Stream, Async, Poll, task};
+use futures_core::{task, Async, Future, Poll, Stream};
 
 use {Sleep, TimerError};
 

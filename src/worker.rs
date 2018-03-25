@@ -4,7 +4,7 @@
 use Builder;
 use mpmc::Queue;
 use wheel::{Token, Wheel};
-use futures::task::Waker;
+use futures_core::task::Waker;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -61,7 +61,11 @@ impl Worker {
 
         // Spawn the worker thread
         let t = thread::Builder::new()
-            .name(builder.thread_name.unwrap_or_else(|| "tokio-timer".to_owned()))
+            .name(
+                builder
+                    .thread_name
+                    .unwrap_or_else(|| "tokio-timer".to_owned()),
+            )
             .spawn(move || run(chan2, wheel))
             .expect("thread::spawn");
 
@@ -86,7 +90,10 @@ impl Worker {
 
     /// Set a timeout
     pub fn set_timeout(&self, when: Instant, waker: Waker) -> Result<Token, Waker> {
-        self.tx.chan.set_timeouts.push(SetTimeout(when, waker))
+        self.tx
+            .chan
+            .set_timeouts
+            .push(SetTimeout(when, waker))
             .and_then(|ret| {
                 // Unpark the timer thread
                 self.tx.worker.unpark();
@@ -97,18 +104,18 @@ impl Worker {
 
     /// Move a timeout
     pub fn move_timeout(&self, token: Token, when: Instant, waker: Waker) -> Result<(), Waker> {
-        self.tx.chan.mod_timeouts.push(ModTimeout::Move(token, when, waker))
+        self.tx
+            .chan
+            .mod_timeouts
+            .push(ModTimeout::Move(token, when, waker))
             .and_then(|ret| {
                 self.tx.worker.unpark();
                 Ok(ret)
             })
-            .map_err(|v| {
-                match v {
-                    ModTimeout::Move(_, _, waker) => waker,
-                    _ => unreachable!(),
-                }
+            .map_err(|v| match v {
+                ModTimeout::Move(_, _, waker) => waker,
+                _ => unreachable!(),
             })
-
     }
 
     /// Cancel a timeout
@@ -120,7 +127,10 @@ impl Worker {
         // 2) Not being able to cancel a timeout is not a huge deal and only
         //    results in a spurious wakeup.
         //
-        let _ = self.tx.chan.mod_timeouts.push(ModTimeout::Cancel(token, instant));
+        let _ = self.tx
+            .chan
+            .mod_timeouts
+            .push(ModTimeout::Cancel(token, instant));
     }
 }
 

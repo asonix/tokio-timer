@@ -2,7 +2,7 @@
 
 use std::cell::UnsafeCell;
 use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Relaxed, Release, Acquire};
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 pub struct Queue<T, U> {
     pad0: [u8; 64],
@@ -25,7 +25,8 @@ impl<T: Send, U: Send + Copy> Queue<T, U> {
     /// Create a new `Queue` with a capacity of `capacity` and with `token`
     /// initialized using the `init` fn
     pub fn with_capacity<F>(capacity: usize, mut init: F) -> Queue<T, U>
-        where F: FnMut() -> U,
+    where
+        F: FnMut() -> U,
     {
         // Capacity must be a power of 2 in order to be able to use a mask to
         // map a sequence number to an index.
@@ -44,7 +45,7 @@ impl<T: Send, U: Send + Copy> Queue<T, U> {
         let buffer = (0..capacity)
             .map(|i| {
                 UnsafeCell::new(Node {
-                    sequence:AtomicUsize::new(i),
+                    sequence: AtomicUsize::new(i),
                     value: None,
                     token: init(),
                 })
@@ -54,7 +55,7 @@ impl<T: Send, U: Send + Copy> Queue<T, U> {
         Queue {
             pad0: [0; 64],
             buffer: buffer,
-            mask: capacity-1,
+            mask: capacity - 1,
             pad1: [0; 64],
             enqueue_pos: AtomicUsize::new(0),
             pad2: [0; 64],
@@ -73,8 +74,7 @@ impl<T: Send, U: Send + Copy> Queue<T, U> {
             let diff: isize = seq as isize - pos as isize;
 
             if diff == 0 {
-                let enqueue_pos = self.enqueue_pos
-                    .compare_and_swap(pos, pos+1, Relaxed);
+                let enqueue_pos = self.enqueue_pos.compare_and_swap(pos, pos + 1, Relaxed);
 
                 if enqueue_pos == pos {
                     unsafe {
@@ -82,7 +82,7 @@ impl<T: Send, U: Send + Copy> Queue<T, U> {
                         (*node.get()).value = Some(value);
 
                         // Update the sequence
-                        (*node.get()).sequence.store(pos+1, Release);
+                        (*node.get()).sequence.store(pos + 1, Release);
 
                         // Return the token
                         return Ok((*node.get()).token);
@@ -108,7 +108,7 @@ impl<T: Send, U: Send + Copy> Queue<T, U> {
             let diff: isize = seq as isize - (pos + 1) as isize;
 
             if diff == 0 {
-                let dequeue_pos = self.dequeue_pos.compare_and_swap(pos, pos+1, Relaxed);
+                let dequeue_pos = self.dequeue_pos.compare_and_swap(pos, pos + 1, Relaxed);
 
                 if dequeue_pos == pos {
                     unsafe {

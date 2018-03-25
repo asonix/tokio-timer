@@ -1,8 +1,8 @@
-use {Builder};
-use futures::task::Waker;
+use Builder;
+use futures_core::task::Waker;
 use slab::Slab;
 use std::{cmp, mem, usize};
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 pub struct Wheel {
     // Actual timer wheel itself.
@@ -84,7 +84,13 @@ impl Wheel {
         assert!(num_slots & mask == 0, "num_slots must be a power of two");
 
         Wheel {
-            wheel: vec![Slot { head: EMPTY, next_timeout: None }; num_slots],
+            wheel: vec![
+                Slot {
+                    head: EMPTY,
+                    next_timeout: None,
+                };
+                num_slots
+            ],
             slab: Slab::with_capacity(builder.get_initial_capacity()),
             start: Instant::now(),
             cur_wheel_tick: 0,
@@ -136,8 +142,7 @@ impl Wheel {
 
         let wheel_idx = self.ticks_to_wheel_idx(tick);
 
-        let actual_tick = self.start +
-                          Duration::from_millis(self.tick_ms) * (tick as u32);
+        let actual_tick = self.start + Duration::from_millis(self.tick_ms) * (tick as u32);
 
         at = actual_tick;
 
@@ -199,7 +204,7 @@ impl Wheel {
                 self.cur_wheel_tick += 1;
                 let idx = self.ticks_to_wheel_idx(self.cur_wheel_tick);
                 self.cur_slab_idx = self.wheel[idx].head;
-                continue
+                continue;
             }
 
             // If we're starting to iterate over a slot, clear its timeout as
@@ -220,9 +225,7 @@ impl Wheel {
 
             if self.time_to_ticks(head_timeout) <= self.time_to_ticks(at) {
                 let task = match self.remove_slab(head) {
-                    Some(Entry::Timeout(v)) => {
-                        Some(v.waker)
-                    }
+                    Some(Entry::Timeout(v)) => Some(v.waker),
                     _ => None,
                 };
 
@@ -246,7 +249,7 @@ impl Wheel {
         for a in self.wheel.iter().filter_map(|s| s.next_timeout.as_ref()) {
             if let Some(b) = min {
                 if b < a {
-                    continue
+                    continue;
                 }
             }
             min = Some(a);
@@ -306,16 +309,16 @@ impl Wheel {
             }
         }
 
-        return Some(entry)
+        return Some(entry);
     }
 
     fn time_to_ticks(&self, time: Instant) -> u64 {
         let dur = time - self.start;
         let ms = dur.subsec_nanos() as u64 / 1_000_000;
         let ms = dur.as_secs()
-                    .checked_mul(1_000)
-                    .and_then(|m| m.checked_add(ms))
-                    .expect("overflow scheduling timeout");
+            .checked_mul(1_000)
+            .and_then(|m| m.checked_add(ms))
+            .expect("overflow scheduling timeout");
         ms / self.tick_ms
     }
 
@@ -362,5 +365,8 @@ pub fn millis(duration: Duration) -> u64 {
     // The saturating is fine because `u64::MAX` milliseconds are still many
     // million years.
     let millis = (duration.subsec_nanos() + NANOS_PER_MILLI - 1) / NANOS_PER_MILLI;
-    duration.as_secs().saturating_mul(MILLIS_PER_SEC).saturating_add(millis as u64)
+    duration
+        .as_secs()
+        .saturating_mul(MILLIS_PER_SEC)
+        .saturating_add(millis as u64)
 }

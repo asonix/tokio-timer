@@ -88,7 +88,7 @@
 #![deny(warnings, missing_docs, missing_debug_implementations)]
 
 #[macro_use]
-extern crate futures;
+extern crate futures_core;
 extern crate slab;
 
 mod interval;
@@ -98,7 +98,7 @@ mod wheel;
 mod worker;
 
 pub use interval::Interval;
-pub use timer::{Sleep, Timer, Timeout, TimeoutStream, TimerError, TimeoutError};
+pub use timer::{Sleep, Timeout, TimeoutError, TimeoutStream, Timer, TimerError};
 
 use std::cmp;
 use std::time::Duration;
