@@ -13,11 +13,11 @@
 //! Here is a simple example of how to use the timer.
 //!
 //! ```rust
-//! extern crate tokio_timer;
+//! extern crate tokio_timer_futures2 as tokio_timer;
 //! extern crate futures;
 //!
 //! use tokio_timer::*;
-//! use futures::*;
+//! use futures::executor::block_on;
 //! use std::time::*;
 //!
 //! pub fn main() {
@@ -32,7 +32,7 @@
 //!     // Use the `Future::wait` to block the current thread until `Sleep`
 //!     // future completes.
 //!     //
-//!     sleep.wait();
+//!     block_on(sleep);
 //! }
 //! ```
 //!

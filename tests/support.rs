@@ -11,7 +11,9 @@ pub fn time<F: FnOnce()>(f: F) -> Elapsed {
 
     f();
 
-    Elapsed { duration: now.elapsed() }
+    Elapsed {
+        duration: now.elapsed(),
+    }
 }
 
 impl Elapsed {
@@ -19,9 +21,19 @@ impl Elapsed {
         let tolerance = Duration::from_millis(TOLERANCE_MS);
 
         if self.duration > dur {
-            assert!(self.duration - dur <= tolerance, "expect={:?}; actual={:?}", dur, self.duration);
+            assert!(
+                self.duration - dur <= tolerance,
+                "expect={:?}; actual={:?}",
+                dur,
+                self.duration
+            );
         } else {
-            assert!(dur - self.duration <= tolerance, "expect={:?}; actual={:?}", dur, self.duration);
+            assert!(
+                dur - self.duration <= tolerance,
+                "expect={:?}; actual={:?}",
+                dur,
+                self.duration
+            );
         }
     }
 }

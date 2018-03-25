@@ -1,11 +1,11 @@
 extern crate futures;
-extern crate tokio_timer as timer;
+extern crate tokio_timer_futures2 as timer;
 
 mod support;
 
 // use futures::*;
 use futures::prelude::*;
-use futures::channel::{oneshot, mpsc};
+use futures::channel::{mpsc, oneshot};
 use futures::executor::block_on;
 use timer::*;
 use std::io;
@@ -17,7 +17,7 @@ fn test_immediate_sleep() {
     let timer = Timer::default();
 
     let mut t = timer.sleep(Duration::from_millis(0));
-    let cx = unsafe{ std::mem::transmute(&mut ()) };
+    let cx = unsafe { std::mem::transmute(&mut ()) };
     assert_eq!(Async::Ready(()), t.poll(cx).unwrap());
 }
 
@@ -45,13 +45,9 @@ fn test_setting_later_sleep_then_earlier_one() {
     let to1 = timer.sleep(dur1);
     let to2 = timer.sleep(dur2);
 
-    let t1 = thread::spawn(move || {
-        support::time(|| block_on(to1).unwrap())
-    });
+    let t1 = thread::spawn(move || support::time(|| block_on(to1).unwrap()));
 
-    let t2 = thread::spawn(move || {
-        support::time(|| block_on(to2).unwrap())
-    });
+    let t2 = thread::spawn(move || support::time(|| block_on(to2).unwrap()));
 
     t1.join().unwrap().assert_is_about(dur1);
     t2.join().unwrap().assert_is_about(dur2);
@@ -96,19 +92,18 @@ fn test_timeout_with_future_completes_first() {
     let dur = Duration::from_millis(300);
 
     let (tx, rx) = oneshot::channel();
-    let rx = rx.then(|res| {
-        match res {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(e),
-            _ => panic!("invalid"),
-        }
+    let rx = rx.then(|res| match res {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        _ => panic!("invalid"),
     });
 
     let to = timer.timeout(rx, dur);
 
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(100));
-        tx.send(Ok::<&'static str, io::Error>("done")).expect("send");
+        tx.send(Ok::<&'static str, io::Error>("done"))
+            .expect("send");
     });
 
     assert_eq!("done", block_on(to).unwrap());
@@ -120,12 +115,10 @@ fn test_timeout_with_timeout_completes_first() {
     let dur = Duration::from_millis(300);
 
     let (_tx, rx) = oneshot::channel::<Result<&'static str, io::Error>>();
-    let rx = rx.then(|res| {
-        match res {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(e),
-            _ => panic!("invalid"),
-        }
+    let rx = rx.then(|res| match res {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        _ => panic!("invalid"),
     });
 
     let to = timer.timeout(rx, dur);
@@ -140,12 +133,10 @@ fn test_timeout_with_future_errors_first() {
     let dur = Duration::from_millis(300);
 
     let (tx, rx) = oneshot::channel();
-    let rx = rx.then(|res| {
-        match res {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(e),
-            _ => panic!("invalid"),
-        }
+    let rx = rx.then(|res| match res {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        _ => panic!("invalid"),
     });
 
     let to = timer.timeout(rx, dur);
@@ -167,12 +158,10 @@ fn test_timeout_stream_with_stream_completes_first() {
     let dur = Duration::from_millis(300);
 
     let (tx, rx) = mpsc::unbounded();
-    let rx = rx.then(|res| {
-        match res {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(e),
-            _ => panic!("invalid"),
-        }
+    let rx = rx.then(|res| match res {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        _ => panic!("invalid"),
     });
 
     let to = timer.timeout_stream(rx, dur);
@@ -187,10 +176,11 @@ fn test_timeout_stream_with_stream_completes_first() {
         block_on(f).unwrap();
     });
 
-    let mut s = block_on(to);
+    let s: Vec<&str> = block_on(to.take(3).collect()).unwrap();
+    let mut s = s.into_iter();
 
-    assert_eq!("one", s.next().unwrap().unwrap());
-    assert_eq!("two", s.next().unwrap().unwrap());
+    assert_eq!("one", s.next().unwrap());
+    assert_eq!("two", s.next().unwrap());
     assert!(s.next().is_none());
 }
 
@@ -200,12 +190,10 @@ fn test_timeout_stream_with_timeout_completes_first() {
     let dur = Duration::from_millis(300);
 
     let (tx, rx) = mpsc::unbounded();
-    let rx = rx.then(|res| {
-        match res {
-            Ok(Ok(v)) => Ok(v),
-            Ok(Err(e)) => Err(e),
-            _ => panic!("invalid"),
-        }
+    let rx = rx.then(|res| match res {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(e),
+        _ => panic!("invalid"),
     });
 
     let to = timer.timeout_stream(rx, dur);
@@ -224,23 +212,18 @@ fn test_timeout_stream_with_timeout_completes_first() {
         drop(tx);
     });
 
-    let mut s = block_on(to);
+    let res: Result<Vec<&str>, _> = block_on(to.take(3).collect());
 
-    assert_eq!("one", s.next().unwrap().unwrap());
-    assert_eq!("two", s.next().unwrap().unwrap());
-
-    let err = s.next().unwrap().unwrap_err();
-    assert_eq!(io::ErrorKind::TimedOut, err.kind());
+    assert!(res.is_err());
 }
 
 #[test]
 fn test_interval_once() {
     let timer = Timer::default();
     let dur = Duration::from_millis(300);
-    let mut interval = timer.interval(dur).wait();
 
     let e1 = support::time(|| {
-        interval.next();
+        let _: Vec<()> = block_on(timer.interval(dur).take(1).collect()).unwrap();
     });
 
     e1.assert_is_about(dur);
@@ -250,11 +233,9 @@ fn test_interval_once() {
 fn test_interval_twice() {
     let timer = Timer::default();
     let dur = Duration::from_millis(300);
-    let mut interval = timer.interval(dur).wait();
 
     let e1 = support::time(|| {
-        interval.next();
-        interval.next();
+        let _: Vec<()> = block_on(timer.interval(dur).take(2).collect()).unwrap();
     });
 
     e1.assert_is_about(dur * 2);
@@ -265,10 +246,14 @@ fn test_interval_at_once() {
     let timer = Timer::default();
     let delay = Duration::from_millis(500);
     let dur = Duration::from_millis(300);
-    let mut interval = timer.interval_at(Instant::now() + delay, dur).wait();
 
     let e1 = support::time(|| {
-        interval.next();
+        let _: Vec<()> = block_on(
+            timer
+                .interval_at(Instant::now() + delay, dur)
+                .take(1)
+                .collect(),
+        ).unwrap();
     });
 
     e1.assert_is_about(delay);
@@ -279,11 +264,14 @@ fn test_interval_at_twice() {
     let timer = Timer::default();
     let delay = Duration::from_millis(500);
     let dur = Duration::from_millis(300);
-    let mut interval = timer.interval_at(Instant::now() + delay, dur).wait();
 
     let e1 = support::time(|| {
-        interval.next();
-        interval.next();
+        let _: Vec<()> = block_on(
+            timer
+                .interval_at(Instant::now() + delay, dur)
+                .take(2)
+                .collect(),
+        ).unwrap();
     });
 
     e1.assert_is_about(delay + dur);
@@ -293,10 +281,14 @@ fn test_interval_at_twice() {
 fn test_interval_at_past() {
     let timer = Timer::default();
     let dur = Duration::from_millis(300);
-    let mut interval = timer.interval_at(Instant::now() - Duration::from_millis(200), dur).wait();
 
     let e1 = support::time(|| {
-        interval.next();
+        let _: Vec<()> = block_on(
+            timer
+                .interval_at(Instant::now() - Duration::from_millis(200), dur)
+                .take(1)
+                .collect(),
+        ).unwrap();
     });
 
     e1.assert_is_about(Duration::from_millis(0));
